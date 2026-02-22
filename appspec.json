@@ -1,5 +1,5 @@
 {
-  "version": "1.1",
+  "version": "1.0",
   "settings": [
     {
       "id": "time_period_start",
@@ -17,79 +17,144 @@
     },
     {
       "id": "fix_na_start_times",
-      "name": "Personalization",
-      "description": "You can personalize the app by providing a file",
-      "type": "USER_FILE"
-    }, 
+      "name": "Fix empty start times",
+      "description": "Define how to deal with NA start dates (deploy_on_timestamp).", 
+      "defaultValue": "timestamp",
+      "type": "RADIOBUTTONS",
+      "options":[
         {
-      "id": "fix_na_start_times",
-      "name": "Personalization",
-      "description": "You can personalize the app by providing a file",
-      "type": "USER_FILE"
-    }, 
+          "value": "timestamp", 
+          "displayText": "Replace NA deploy_on_timestamp with time_period_start"
+        }, 
         {
-      "id": "fix_na_start_times",
-      "name": "Personalization",
-      "description": "You can personalize the app by providing a file",
-      "type": "USER_FILE"
+          "value": "remove",
+          "displayText": "Remove tracks with NA deploy_on_timestamp" 
+        }
+      ]
     }, 
+    {
+      "id": "fix_na_end_times",
+      "name": "Fix empty end times",
+      "description": "Define how to deal with NA end dates (deploy_off_timestamp).", 
+      "defaultValue": "timestamp",
+      "type": "RADIOBUTTONS",
+      "options":[
         {
-      "id": "fix_na_start_times",
-      "name": "Personalization",
-      "description": "You can personalize the app by providing a file",
-      "type": "USER_FILE"
+          "value": "timestamp", 
+          "displayText": "Replace NA deploy_off_timestamp with time_period_end"
+        }, 
+        {
+          "value": "systime",
+          "displayText": "Replace NA deploy_off_timestamp with current date" 
+        }, 
+        {
+          "value": "remove",
+          "displayText": "Remove tracks with NA deploy_off_timestamp" 
+        }
+      ]
+    }, 
+    {
+      "id": "censor_capture_mortality",
+      "name": "Censor capture-related mortality",
+      "description": "If necessary, input number of days to exclude from analysis post-capture.",
+      "defaultValue": 0,
+      "type": "INTEGER"
+    }, 
+    {
+      "id": "group_comparison_individual",
+      "name": "Groups for comparison",
+      "description": "If interested in comparing across groups, identify the grouping variable.",
+      "defaultValue": null,
+      "type": "DROPDOWN",
+      "options": [
+        {
+          "value": null,
+          "displayText": "No comparison (all individuals)"
+        },
+        {
+          "value": "sex",
+          "displayText": "Sex"
+        },
+        {
+          "value": "lifestage",
+          "displayText": "Life stage"
+        },
+        {
+          "value": "reproCond",
+          "displayText": "Reproductive condition"
+        },
+        {
+          "value": "attachment",
+          "displayText": "Attachment type"
+        }
+      ]
     }
   ],
   "dependencies": {
     "R": [
-      {
-        "name": "lubridate"
-      },
-      {
-        "remotes": "install_git('https://gitlab.com/bartk/move2.git')"
-      }
+      {"name": "move2"},
+      {"name": "survival"},
+      {"name": "survminer"},
+      {"name": "ggplot2"},
+      {"name": "dplyr"},
+      {"name": "lubridate"},
+      {"name": "stringr"},
+      {"name": "sf"},
+      {"name": "forecats"}
     ]
   },
-  "providedAppFiles": [
-    {
-      "settingId": "auxiliary-file-a",
-      "from": "data/auxiliary/user-files/provided-app-files/auxiliary-file-a/sample.txt"
-    }
-  ],
   "license": {
     "key": "MIT"
   },
   "language": "eng",
   "keywords": [
-    "example",
-    "template"
+    "survival analysis",
+    "mortality"
   ],
   "people": [
+    "people": [
     {
-      "firstName": "Charles",
+      "firstName": "Meredith",
+      "middleInitials": "S.",
+      "lastName": "Palmer",
+      "email": "mspalmer.zool@gmail.com",
+      "roles": ["author", "creator", "contractor"],
+      "orcid": "0000-0002-1416-1732",
+      "affiliation": "Yale University", 
+      "affiliationRor": null
+    }, 
+    {
+      "firstName": "Jasmine",
       "middleInitials": null,
-      "lastName": "Darwin",
-      "email": "creator@example.com",
-      "roles": [
-        "author",
-        "creator"
-      ],
+      "lastName": "Ware",
+      "email": "Jasmine.Ware@yukon.ca",
+      "roles": ["contributor", "funder"],
       "orcid": null,
-      "affiliation": null,
+      "affiliation": "Government of Yukon",
+      "affiliationRor": null
+    }, 
+    {
+      "firstName": "Mike",
+      "middleInitials": null,
+      "lastName": "Suitor",
+      "email": "Mike.Suitor@yukon.ca",
+      "roles": ["contributor", "funder"],
+      "orcid": null,
+      "affiliation": "Government of Yukon", 
       "affiliationRor": null
     }
   ],
   "funding": [
     {
-      "name": "funder name",
+      "name": "Government of Yukon",
       "comment": "grant for App"
     }
   ],
   "references": [
     {
       "type": "IsDescribedBy",
-      "note": "Darwin, C. 1900. The creation. Journal XY. 1-2",
-      "url": "https://anylink.xyz"
+      "note": "Kaplan, E. L.; Meier, P. 1958. Nonparametric estimation from incomplete observations. J. Amer. Statist. Assoc. 53 (282): 457–481",
+      "url": "https://www.tandfonline.com/doi/abs/10.1080/01621459.1958.10501452"
     }
   ]
 }
