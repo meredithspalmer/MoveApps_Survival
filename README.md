@@ -33,7 +33,7 @@ The app then summarizes the data into a per-individual table and figure containi
 Finally, the app performs Kaplan-Meier survival estimation on the cleaned dataset, generating: 
 - Summary statistics 
 - A KM survival curve (estimated survival probability over time, with 95% confidence intervals)
-- A cumulative hazard plot (total accumulated riskover time, with 95% confidence intervals)
+- A cumulative hazard plot (total accumulated risk over time, with 95% confidence intervals)
 
 When group comparison is enabled, the app additionally produces:  
 - A table of log-rank test results  
@@ -44,9 +44,9 @@ When group comparison is enabled, the app additionally produces:
 
 #### Generality of App usability
 
-This app has currently been tested on mammals and birds with N_individuals > 100, N_deaths > ..., and study duration >1 year, but should be applicable to any dataset containing mortality data of sufficient sample size (see below). 
+This app has currently been tested on mammals and birds with N_individuals > 100, N_deaths > 50, and study duration >1 year, but should be applicable to any dataset containing mortality data of sufficient sample size (see below). 
 
-This app allows for staggered entry during the defined study period and for censored data (individuals that are "lost" due to equipment failure, etc.). 
+This app allows for staggered entry during the defined study period and for censored data (individuals that are "lost" from the study, e.g., due to equipment failure and individuals that survive the study period). 
 
 
 #### Required data properties
@@ -57,14 +57,11 @@ The app will produce a warning and terminate if none of the individuals in the s
 
 **Sample size**: The required sample size for a KM survival analysis depends primarily on the total number of deaths, rather than the total number of individuals. In general, the lower the event (death) rate, the higher the number of required individuals. 
 
-This app does *NOT* perform a power analysis prior to performing the survival analyzes. However, if fewer than 10 mortality events are detected, the app will generate a warning that the model may have low statistical power, potentially resulting in unreliable estimates and poor predictive power. 
+This app does *not* perform a power analysis prior to performing the survival analyzes. However, if fewer than 10 mortality events are detected, the app will generate a warning that the model may have low statistical power, potentially resulting in unreliable estimates and poor predictive power. 
 
 Note that a larger sample size is required for comparison across groups, 
 
-**Comparison types:** 
-
-Note that this is different from a Cox Proportional Hazard model 
-
+**Comparison types:** This app enables the user to select one of four grouping options to compare across. These currently include sex, lifestage, reproductive condition, and collar attachment type. These grouping classifications are cleaned and standardized for capitalization and white-space errors (e.g., "male" and "Male" will register as the same class) but note that other mispecifications (e.g., "male" vs. "M") will calculate as separate groups. 
 
 
 ### Input type
@@ -79,30 +76,51 @@ Note that this is different from a Cox Proportional Hazard model
 
 *Tracking history*: Figure (`tracking_history.png`) detailing the start and end dates of each individual across the study and during the tracking period, along with an indicator of how each individual was terminated (death, censored, survived). 
 
-*Life table:* Output of KM survival analysis; table (`survival_statistics.csv`) with the time, number of individuals at risk, number of events, survival, standard error, and upper & lower 95% confidence intervals. 
+*Life table:* Output of KM survival analysis; table (`survival_statistics.csv`) with the time, number of individuals at risk, number of events, survival, standard error, and upper/lower 95% confidence intervals. 
 
-*KM survival curve:* KM survival curve plot (`km_survival_curve.png`), detailing median survival time. 
+*KM survival curve:* Plot (`km_survival_curve.png`), depicting survival over time with median survival time indicated. 
 
-*Cumulative hazard plot:* ... includes number of individuals at risk per time period and number of events per time period. 
+*Cumulative hazard plot:* Plot (`cumulative_hazard_plot.png`), depicting total accumulated risk (expected number of accumulated deaths) over time. 
 
 *Log-rank test:* Output of comparing survival curves between groups; table (`logrank_table_statistics.csv`) with test statistics, degrees of freedom, p-value, and pairwise comparisons. 
 
-*Comparison curves:*:  .... 
+*Comparison curves:*: Plot (`km_comparison_curves.png`), depicting survival curves by selected group. 
 
 
 ### Settings 
 
-*Example:* `Radius of resting site` (radius): Defined radius the animal has to stay in for a given duration of time for it to be considered resting site. Unit: `metres`.
+`Start date` and `End date`: Temporal limits of the study period. If left null (default), the analysis will encompass the entire study period. Useful for defining a study year. Unit: `date`. 
 
-*Please list and define all settings/parameters that the App requires to be set by the App user, if necessary including their unit. Please first state the Setting name the user encounters in the Settings menu defined in the appspecs.json, and between brackets the argument used in the R function to be able to identify it quickly in the code if needed.*
+`Fix empty start times` and `Fix empty end times`: Defines how the app handles NA dates (`deploy_on_timestamp` and`deploy_off_timestamp`) at the beginning and end of the study. Options include: 
+- Replacing with the first/last recorded timestamp (default)
+- Replacing with the current date (for end times only)
+- Removing missing data 
 
-*Example:* `Radius of resting site` (radius): Defined radius the animal has to stay in for a given duration of time for it to be considered resting site. Unit: `metres`.
+`Censor capture-related mortality`: If capture-related mortality is a concern, this setting allows users to define a number of days post-capture to exclude from the overall analysis. Default is no censoring. Unit: `days`. 
+
+`Groups for comparison`: If interested in comparing across groups, this identifies the grouping variable. Default is no group comparisons. Options currently include: 
+- Sex
+- Lifestage 
+- Reproductive condition
+- Attachment type 
+
 
 ### Most common errors
 
-Please send errors to mspalmer.zool@gmail.com 
+Please document and send errors to mspalmer.zool@gmail.com. 
+
 
 ### Null or error handling
+
+See null handling outlined in *Settings*. 
+
+The app will log warnings quantifying the reductions in sample size due to data cleaning and censoring, as well as indicating how many null timestamps were updated or removed.  
+
+The app will log warnings when data includes fewer than 10 mortality events and will terminate if there are no mortality events. 
+
+Errors may arise due to how mortality events are recorded (what metadata flag mortality and whether mortality is associated with a specific end date). If mortality is logged in a column not mentioned in this documentation, it will not be recognized. 
+
+
 
 *Please indicate for each setting as well as the input data which behaviour the App is supposed to show in case of errors or NULL values/input. Please also add notes of possible errors that can happen if settings/parameters are improperly set and any other important information that you find the user should be aware of.*
 
