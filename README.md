@@ -1,6 +1,4 @@
-# Name of App 
-
-KM Survival App 
+# KM Survival App 
 
 Github repository: 
 
@@ -18,7 +16,7 @@ Users can define a study period, censor for post-capture mortality, and indicate
 
 Users can also indicate whether they want additional analyses comparing key groups of interest, currently, segregated by sex, lifestage, reproductive condition, or attachment style. 
 
-Data are cleaned (removing empty locations, marked outliers, marked test data, start dates occurring after end dates), dates are processed occurring to user inputs (crop to study period and format any missing start/end dates). 
+Data are cleaned, removing empty locations, marked outliers, marked test data, start dates occurring after end dates. Dates are processed according to user inputs (i.e., crop to study period and format any missing start/end dates). 
 
 Next, data are summarized into a table containing the duration (start and end dates, to allow for staggered entry) of each individual and a survival event indicator is derived (1 if mortality occurs during the study period, 0 if individual survives or data are censored, e.g., collar or individual is lost). 
 
@@ -55,15 +53,15 @@ Note that a larger sample size is required for comparison across groups,
 
 ### Artefacts
 
-*Tracking history:* `tracking_history.png`: Figure (png) detailing the start and end dates of each individual across the study and during the tracking period, along with an indicator of how each individual was terminated (death, censored, survived). 
+*Tracking history*: Figure (`tracking_history.png`) detailing the start and end dates of each individual across the study and during the tracking period, along with an indicator of how each individual was terminated (death, censored, survived). 
 
-*Life table:* `survival_statistics.csv`: Output of KM survival analysis; table (csv) with the time, number of individuals at risk, number of events, survival, standard error, and upper & lower 95% confidence intervals. 
+*Life table:* Output of KM survival analysis; table (`survival_statistics.csv`) with the time, number of individuals at risk, number of events, survival, standard error, and upper & lower 95% confidence intervals. 
 
-*KM survival curve:* `km_survival_curve.png`: KM survival curve plot (png), detailing median survival time. 
+*KM survival curve:* KM survival curve plot (`km_survival_curve.png`), detailing median survival time. 
 
 *Cumulative hazard plot:* ... includes number of individuals at risk per time period and number of events per time period. 
 
-*Log-rank test:* `logrank_table_statistics.csv`: Output of comparing survival curves between groups; table (csv) with test statistics, degrees of freedom, p-value, and pairwise comparisons. 
+*Log-rank test:* Output of comparing survival curves between groups; table (`logrank_table_statistics.csv`) with test statistics, degrees of freedom, p-value, and pairwise comparisons. 
 
 *Comparison curves:*:  .... 
 
