@@ -61,7 +61,7 @@ This app does *not* perform a power analysis prior to performing the survival an
 
 Note that a larger sample size is required for comparison across groups, 
 
-**Comparison types:** This app enables the user to select one of four grouping options to compare across. These currently include sex, lifestage, reproductive condition, and collar attachment type. These grouping classifications are cleaned and standardized for capitalization and white-space errors (e.g., "male" and "Male" will register as the same class) but note that other mispecifications (e.g., "male" vs. "M") will calculate as separate groups. 
+**Comparison types:** This app enables the user to select one of four grouping options to compare across. These currently include sex, lifestage, reproductive condition, and collar attachment type. These grouping classifications are cleaned and standardized for capitalization and white-space errors (e.g., "male" and "Male" will register as the same class) but note that other mispecifications (e.g., "male " vs. "M") will calculate as separate groups. 
 
 
 ### Input type
@@ -119,9 +119,3 @@ The app will log warnings quantifying the reductions in sample size due to data 
 The app will log warnings when data includes fewer than 10 mortality events and will terminate if there are no mortality events. 
 
 Errors may arise due to how mortality events are recorded (what metadata flag mortality and whether mortality is associated with a specific end date). If mortality is logged in a column not mentioned in this documentation, it will not be recognized. 
-
-
-
-*Please indicate for each setting as well as the input data which behaviour the App is supposed to show in case of errors or NULL values/input. Please also add notes of possible errors that can happen if settings/parameters are improperly set and any other important information that you find the user should be aware of.*
-
-**Setting `radius`:** If no radius AND no duration are given, the input data set is returned with a warning. If no radius is given (NULL), but a duration is defined then a default radius of 1000m = 1km is set. 
