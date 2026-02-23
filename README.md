@@ -6,42 +6,66 @@ https://github.com/meredithspalmer/MoveApps_Survival
 
 ## Description
 
-Perform basic Kaplan-Meier survival analyses. 
+Perform basic Kaplan-Meier survival analyses and optional group comparisons via the log-rank test
 
 ## Documentation
 
-This app implements fundamental Kaplan-Meier (KM) survival estimation functions, including producing life tables, survival curves, cumulative hazard curves, and per-group estimation. 
+This app implements fundamental Kaplan-Meier (KM) survival estimation functions. It produces life tables, survival curves, cumulative hazard curves, and, if applicable, statistical comparisons of per-group survival estimation.
 
-Users can define a study period, censor for post-capture mortality, and indicate how null timestamp data should be handled. 
+**Kaplan-Meier Survival Estimation:** The KM estimator is a non-parametric method used to estimate the survival function, that is, the probability that an individual survives past time t, from lifetime data. This analysis allows for:
+- *Right-censoring*, where the exact time of death is unknown for some individuals because they are still alive at the end of the study period, lost to follow-up (e.g., collar failure), or exit the study period alive for other reasons. 
+- *Staggered entry* (also called left truncation or delayed entry), where individuals enter the study at different times rather than all starting at the same baseline. 
 
-Users can also indicate whether they want additional analyses comparing key groups of interest, currently, segregated by sex, lifestage, reproductive condition, or attachment style. 
+**Log-rank Test:** Users can request log-rank tests (Mantel–Cox test) to compare survival distributions across groups. The log-rank test assesses whether there are statistically significant differences in survival between two or more independent groups. Currently supported grouping variables are: sex, life stage, reproductive condition, or tag/collar attachment type. 
 
-Data are cleaned, removing empty locations, marked outliers, marked test data, start dates occurring after end dates. Dates are processed according to user inputs (i.e., crop to study period and format any missing start/end dates). 
+Users define a study period, can censor data to exclude post-capture mortality events, and specify how to handle missing timestamp information.
 
-Next, data are summarized into a table containing the duration (start and end dates, to allow for staggered entry) of each individual and a survival event indicator is derived (1 if mortality occurs during the study period, 0 if individual survives or data are censored, e.g., collar or individual is lost). 
+Data pre-processing includes:  
+- Removing or updating empty or invalid data (according to user specification)
+- Flagging and handling marked outliers and test data  
+- Checking for logical errors (e.g., start date after end date)  
+- Subsetting data to study period or select individuals (according to user specification)
 
-Basic summaries are producing, including graphs and tables detailing each individual's survival tenure during the study period. 
+The app then summarizes the data into a per-individual table and figure containing:  
+- Duration within the study period (accounting for staggered entry and censoring)  
+- Survival event indicator (1 = death occurred during study period, 0 = censored or survived)  
 
-A Kaplan-Meier survival estimation is run allowing for staggered entry. Outputs include a life table, a KM survival curve, and a cumulative hazard plot. 
+Finally, the app performs Kaplan-Meier survival estimation on the cleaned dataset, generating: 
+- Summary statistics 
+- A KM survival curve (estimated survival probability over time, with 95% confidence intervals)
+- A cumulative hazard plot (total accumulated riskover time, with 95% confidence intervals)
 
-Users have the option to select groups for comparison: if this option is selected, the app will also produce a table of log-rank test outputs along with a plot contrasting each survival curve. 
+When group comparison is enabled, the app additionally produces:  
+- A table of log-rank test results  
+- A comparative survival curve plot contrasting the groups
 
 
 ### Application scope
 
 #### Generality of App usability
 
-The app will produce a warning and terminate if none of the individuals in the study experienced a mortality event during the study period. 
+This app has currently been tested on mammals and birds with N_individuals > 100, N_deaths > ..., and study duration >1 year, but should be applicable to any dataset containing mortality data of sufficient sample size (see below). 
 
-This app allows for staggered entry during the defined study period. 
+This app allows for staggered entry during the defined study period and for censored data (individuals that are "lost" due to equipment failure, etc.). 
+
 
 #### Required data properties
 
-**Events**: This app can only be used if mortality information is captured in one of the following columns: death_comments, deployment_end_comments, deployment_end_type, mortality_location_filled. 
+**Events**: This app can only be used if mortality information (indication of event along with an associated end date) is captured in one of the following columns: death_comments, deployment_end_comments, deployment_end_type, mortality_location_filled. 
 
-**Sample size**: The required sample size for a KM survival analysis depends primarily on the total number of deaths, rather than the total number of individuals. In general, the lower the event (death) rate, the higher the number of required individuals. This app does NOT perform a power analysis prior to performing the survival analyzes. However, if fewer than 10 mortality events are detected, the app will generate a warning that the model may have low statistical power, potentially resulting in unreliable estimates and poor predictive power. 
+The app will produce a warning and terminate if none of the individuals in the study experienced a mortality event during the study period. 
+
+**Sample size**: The required sample size for a KM survival analysis depends primarily on the total number of deaths, rather than the total number of individuals. In general, the lower the event (death) rate, the higher the number of required individuals. 
+
+This app does *NOT* perform a power analysis prior to performing the survival analyzes. However, if fewer than 10 mortality events are detected, the app will generate a warning that the model may have low statistical power, potentially resulting in unreliable estimates and poor predictive power. 
 
 Note that a larger sample size is required for comparison across groups, 
+
+**Comparison types:** 
+
+Note that this is different from a Cox Proportional Hazard model 
+
+
 
 ### Input type
 
