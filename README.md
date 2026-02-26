@@ -76,7 +76,7 @@ Note that a larger sample size is required for comparison across groups,
 
 *Tracking history*: Figure (`tracking_history.png`) detailing the start and end dates of each individual across the study and during the tracking period, along with an indicator of how each individual was terminated (death, censored, survived). 
 
-*Life table:* Output of KM survival analysis; table (`survival_statistics.csv`) with the time, number of individuals at risk, number of events, survival, standard error, and upper/lower 95% confidence intervals. 
+*Life table:* Output of KM survival analysis; table (`life_table.csv`) with the time, number of individuals at risk, number of events, survival, standard error, and upper/lower 95% confidence intervals. 
 
 *KM survival curve:* Plot (`km_survival_curve.png`), depicting survival over time with median survival time indicated. 
 

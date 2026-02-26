@@ -662,49 +662,13 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
   write.csv(life_table, file = appArtifactPath("life_table.csv", row.names = F))
   
   
-  ## KM Survival Curve ---
-  km_summary <- summary(km_fit)
-  km_df <- data.frame(time    = km_summary$time,
-                      surv    = km_summary$surv,    
-                      n_risk  = km_summary$n.risk,   
-                      n_event = km_summary$n.event,  
-                      lower   = km_summary$lower,   
-                      upper   = km_summary$upper,  
-                      std_err = km_summary$std.err)
+  ## Plotting statistics --- 
   n.ind <- nrow(summary_table)
-  n.events <- nrow(summary_table[summary_table$survival_event == 1,])
+  n.events <- nrow(summary_table[summary_table$mortality_event == 1,])
   n.days <- as.numeric(summary(km_fit)$table["median"])
   
-  km_curve <- ggplot(km_df, aes(x = time, y = surv)) +
-      geom_ribbon(aes(ymin = lower, ymax = upper), fill = "#AED6F1", alpha = 0.4) +
-      geom_step(linewidth = 1, color = "#21618C") +
-      scale_x_continuous(breaks = seq(0, max(km_df$time, na.rm = TRUE), by = 200),
-                         expand = c(0, 0)) +
-      scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1),
-                         expand = c(0, 0)) +
-      labs(title    = "Kaplan-Meier Survival Curve",
-           subtitle = paste0("N = ", n.ind, ", Events = ", n.events, ", Median Survival =", 
-                             n.days),
-           x        = "Time (days)",
-           y        = "Survival Probability",
-           caption  = "95% Confidence Interval Shaded") +
-      theme_classic(base_size = 12) +
-      theme(plot.title   = element_text(face = "bold", size = 14), 
-            plot.subtitle = element_text(size = 12, color = "gray50"),
-            axis.text    = element_text(color = "black"),
-            panel.grid.major.y = element_line(color = "gray90"), 
-            panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
-            plot.margin  = margin(10, 10, 10, 10))
-
-  # want to figure out how to add width, height, units, dpi, bg to artifact 
-  artifact <- appArtifactPath("km_survival_curve.png")
-  logger.info(paste("Saving Kaplan-Meier survival curve plot:", artifact))
-  png(artifact)
-  km_curve
-  dev.off()
-  
-  # alternative curve -
-  km_curve_2 <- ggsurvplot(
+  ## KM Survival Curve ---
+  km_curve <- ggsurvplot(
     km_fit,
     data = summary_table,
     title = "Kaplan-Meier Survival Curve",
@@ -714,9 +678,9 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
     ylab = "Survival Probability",
     risk.table = TRUE,
     risk.table.col = "strata",
-    risk.table.title = "At Risk",
+    risk.table.title = "Number at Risk",
     risk.table.y.text = FALSE,     
-    risk.table.height = 0.28,
+    risk.table.height = 0.18,
     conf.int = TRUE,
     censor.shape = "|",
     censor.size = 3,
@@ -733,11 +697,43 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
             plot.margin        = margin(10, 10, 10, 10)))
           
   # want to figure out how to add width, height, units, dpi, bg to artifact 
-  artifact <- appArtifactPath("km_survival_curve_2.png")
+  artifact <- appArtifactPath("km_survival_curve.png")
   logger.info(paste("Saving Kaplan-Meier survival curve plot:", artifact))
   png(artifact)
-  km_curve_2
+  km_curve
   dev.off()
+  
+  ## Cumulative hazard plot ----
+  cum_hazard <- ggsurvplot(
+    km_fit,
+    fun = "cumhaz",
+    conf.int = TRUE,
+    risk.table = TRUE,
+    cumevents = TRUE,                 
+    tables.height = 0.18,              
+    tables.y.text = FALSE,            
+    surv.median.line = "hv",         
+    pval = TRUE,                     
+    xlab = "Time (days)",
+    ylab = "Cumulative Hazard",
+    title = "Cumulative Hazard",
+    subtitle = paste0("N = ", n.ind, ", Events = ", n.events), #update events 
+    palette = c("#E69F00", "#56B4E9"),
+    ggtheme = theme_classic(base_size = 12) + 
+      theme(plot.title   = element_text(face = "bold", size = 14), 
+            plot.subtitle = element_text(size = 12, color = "gray50"),
+            axis.text    = element_text(color = "black"),
+            panel.grid.major.y = element_line(color = "gray90"), 
+            panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+            plot.margin  = margin(10, 10, 10, 10)))
+  
+  # want to figure out how to add width, height, units, dpi, bg to artifact 
+  artifact <- appArtifactPath("cumulative_hazard_plot.png")
+  logger.info(paste("Saving cumulative hazard plot:", artifact))
+  png(artifact)
+  cum_hazard
+  dev.off()
+  
   
   
   
