@@ -675,7 +675,7 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
   n.events <- nrow(summary_table[summary_table$survival_event == 1,])
   n.days <- as.numeric(summary(km_fit)$table["median"])
   
-  (km_curve <- ggplot(km_df, aes(x = time, y = surv)) +
+  km_curve <- ggplot(km_df, aes(x = time, y = surv)) +
       geom_ribbon(aes(ymin = lower, ymax = upper), fill = "#AED6F1", alpha = 0.4) +
       geom_step(linewidth = 1, color = "#21618C") +
       scale_x_continuous(breaks = seq(0, max(km_df$time, na.rm = TRUE), by = 200),
@@ -694,9 +694,50 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
             axis.text    = element_text(color = "black"),
             panel.grid.major.y = element_line(color = "gray90"), 
             panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
-            plot.margin  = margin(10, 10, 10, 10)))
+            plot.margin  = margin(10, 10, 10, 10))
 
+  # want to figure out how to add width, height, units, dpi, bg to artifact 
+  artifact <- appArtifactPath("km_survival_curve.png")
+  logger.info(paste("Saving Kaplan-Meier survival curve plot:", artifact))
+  png(artifact)
+  km_curve
+  dev.off()
   
+  # alternative curve -
+  km_curve_2 <- ggsurvplot(
+    km_fit,
+    data = summary_table,
+    title = "Kaplan-Meier Survival Curve",
+    subtitle = paste0("N = ", n.ind, ", Events = ", n.events, ", Median Survival = ", 
+                      med$median, " days"),
+    xlab = "Time (days)",
+    ylab = "Survival Probability",
+    risk.table = TRUE,
+    risk.table.col = "strata",
+    risk.table.title = "At Risk",
+    risk.table.y.text = FALSE,     
+    risk.table.height = 0.28,
+    conf.int = TRUE,
+    censor.shape = "|",
+    censor.size = 3,
+    legend = "none",
+    pval = TRUE,
+    surv.median.line = "hv",        
+    palette = c("#E69F00", "#56B4E9"),
+    ggtheme = theme_classic(base_size = 12) + 
+      theme(plot.title         = element_text(face = "bold", size = 14), 
+            plot.subtitle      = element_text(size = 12, color = "gray50"),
+            axis.text          = element_text(color = "black"),
+            panel.grid.major.y = element_line(color = "gray90"), 
+            panel.border       = element_rect(color = "black", fill = NA, linewidth = 0.5),
+            plot.margin        = margin(10, 10, 10, 10)))
+          
+  # want to figure out how to add width, height, units, dpi, bg to artifact 
+  artifact <- appArtifactPath("km_survival_curve_2.png")
+  logger.info(paste("Saving Kaplan-Meier survival curve plot:", artifact))
+  png(artifact)
+  km_curve_2
+  dev.off()
   
   
   
