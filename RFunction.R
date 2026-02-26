@@ -667,6 +667,7 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
   n.events <- nrow(summary_table[summary_table$mortality_event == 1,])
   n.days <- as.numeric(summary(km_fit)$table["median"])
   
+  
   ## KM Survival Curve ---
   km_curve <- ggsurvplot(
     km_fit,
@@ -703,6 +704,7 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
   km_curve
   dev.off()
   
+  
   ## Cumulative hazard plot ----
   cum_hazard <- ggsurvplot(
     km_fit,
@@ -735,32 +737,57 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
   dev.off()
   
   
+  ## Group comparisons ---
+  if (!is.null(group_comparison_individual)) {
   
+    # Fit survival object 
+    summary_table$time_at_risk <- summary_table$exit_time_days - summary_table$entry_time_days
+    formula_str <- paste("Surv(time_at_risk, mortality_event) ~", group_comparison_individual)
+    surv_formula <- as.formula(formula_str)
+    km_fit_comp <- survfit(surv_formula, data = summary_table)
+    
+    ## Log-Rank test --- 
+    test <- survdiff(surv_formula, data=summary_table)
+    
+    # Extract components
+    groups <- names(test$n)
+    n_total <- sum(test$n)
+    events_total <- sum(test$obs)
+    chisq_val <- round(test$chisq, 2)
+    df_val <- length(test$n) - 1
+    p_val <- 1 - pchisq(test$chisq, df_val)
+    p_formatted <- ifelse(p_val < 0.001, "<0.001", sprintf("%.3f", p_val))
+    
+    # Summary table 
+    per_group <- tibble(`Reproductive condition` = sub(".*=", "", groups),    
+                        `N`                      = test$n,
+                        `Events`                 = test$obs,
+                        `Expected events`        = round(test$exp, 2),
+                        `O/E ratio`              = round(test$obs / test$exp, 2)) %>%
+      mutate(`N (events)` = sprintf("%d (%d)", N, Events),
+             .keep = "unused")
   
-  result <- if (any(lubridate::year(move2::mt_time(data)) == year)) { 
-    data[lubridate::year(move2::mt_time(data)) == year,]
-  } else {
-    NULL
+    summary_row <- tibble(`Reproductive condition` = "Overall",
+                          `N (events)`             = sprintf("%d (%d)", n_total, events_total),
+                          `Chisq (log-rank)`       = chisq_val,
+                          `df`                     = df_val,
+                          `p-value`                = p_formatted)
+    
+    logrank_table <- bind_rows(per_group, summary_row)
+    logrank_table <- logrank_table %>%
+      select(`Reproductive condition`, `N (events)`, `Expected events`, `O/E ratio`,
+             `Chisq (log-rank)`, df, `p-value`)
+    
+    # double check that adding row.names = F doesn't cause issues 
+    write.csv(logrank_table, file = appArtifactPath("logrank_table_statistics.csv", row.names = F))
+    
+    ## Comparison plots ---
+    
+      
   }
   
-  if (!is.null(result)) {
-    # Showcase creating an app artifact. 
-    # This artifact can be downloaded by the workflow user on Moveapps.
-    artifact <- appArtifactPath("plot.png")
-    logger.info(paste("plotting to artifact:", artifact))
-    png(artifact)
-    plot(result[move2::mt_track_id_column(result)], max.plot=1)
-    dev.off()
-  } else {
-    logger.warn("nothing to plot")
-  }
   
-  # Showcase to access a file ('auxiliary files') that is 
-  # a) provided by the app-developer and 
-  # b) can be overridden by the workflow user.
-  fileName <- getAuxiliaryFilePath("auxiliary-file-a")
-  logger.info(readChar(fileName, file.info(fileName)$size))
-
+ 
   # Pass original to the next app in the MoveApps workflow
   return(data)
 }
