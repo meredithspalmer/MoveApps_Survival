@@ -15,7 +15,7 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
   
   logger.info(paste("Welcome to the", sdk))
   
-  ## Basic cleaning ---
+  ## Cleaning and cropping ----------------------------------------------------
   
   data <- dplyr::filter(data, !sf::st_is_empty(data))       # Exclude empty locations
   data <- mt_filter_unique(data)                            # Exclude marked outliers 
@@ -336,6 +336,10 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
   
   ## Calculate mortality indicator ---
   # Here, event = 1 if observed death, 0 if censored or survived 
+  # death comments to flag 
+  positive_pattern <- "dead|death|cod|predation|predator|vehicle|collision|killed|poach|shot|hunt|harvest|mortality"
+  
+  # search in data 
   summary_table <- summary_table %>%
     
     # Initialize mortality event 
@@ -370,13 +374,12 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
     # A. death_comments keywords
     mutate(
       mortality_event = case_when(
-        "death_comments" %in% names(.) &
-          str_detect(tolower(death_comments),
-                     "dead|death|cod|predation|predator|vehicle|collision|killed|poach|shot|hunt|harvest") ~ 1L,
+        "death_comments" %in% names(.) & str_detect(tolower(death_comments), "\\bnot\\b") ~ 0L,
+        "death_comments" %in% names(.) & str_detect(tolower(death_comments), positive_pattern) ~ 1L,
         mortality_event == 1L ~ 1L,
         TRUE ~ mortality_event
       )
-    ) %>%
+    ) %>% 
     
     # B. mortality_location_filled
     mutate(
@@ -436,7 +439,264 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
             call. = FALSE, immediate. = TRUE)
   }
   
-  ADD ATTRIBUTE CODE 
+  
+  ## Clean user-defined attributes for comparison (if applicable) --- 
+  if(group_comparsion_individual == "sex"){
+    
+    # Remove NAs 
+    n_original <- nrow(summary_table)
+    summary_table <- summary_table[!is.na(summary_table$sex),] 
+    
+    # Get unique sexes after cleaning
+    unique_sexes <- sort(unique(summary_table$sex))
+    n_sexes <- length(unique_sexes)
+    
+    logger.info(sprintf("%d sexes detected after cleaning: %s", n_sexes, 
+                    paste(unique_sexes, collapse = ", ")),
+            call. = FALSE, immediate. = TRUE)
+    
+    n_lost <- n_original - nrow(summary_table)
+    if (n_lost > 0) {
+      logger.warn(sprintf("%d individuals with NA sex removed from study.", n_lost),
+              call. = FALSE, immediate. = TRUE)
+    }
+  }
+  
+  if(group_comparsion_individual == "lifestage"){
+    
+    # Clean data, remove NA rows
+    n_original <- nrow(summary_table)
+    summary_table <- summary_table %>%
+      filter(!is.na(animal_life_stage)) %>%
+      mutate(
+        animal_life_stage = str_trim(animal_life_stage),
+        animal_life_stage = str_replace_all(animal_life_stage, "\\s+", ""),
+        animal_life_stage = str_extract(animal_life_stage, "^[^|]+"),
+        animal_life_stage = str_replace(animal_life_stage, "–", "-"))
+    
+    # Get unique life-stages after cleaning
+    unique_stages <- sort(unique(summary_table$animal_life_stage))
+    n_life_stages <- length(unique_stages)
+    
+    logger.info(sprintf("%d life-stages detected after cleaning: %s", n_life_stages, 
+                        paste(unique_stages, collapse = ", ")),
+                call. = FALSE, immediate. = TRUE)
+    
+    n_lost <- n_original - nrow(summary_table)
+    if (n_lost > 0) {
+      logger.warn(sprintf("%d individuals with NA life stage removed from study.", n_lost),
+              call. = FALSE, immediate. = TRUE)
+    }
+  }
+  
+  if(group_comparsion_individual == "reproCond"){
+  
+    # Clean data, remove NAs 
+    n_original <- nrow(summary_table)
+    summary_table <- summary_table %>%
+      filter(!is.na(animal_reproductive_condition)) %>%
+      mutate(
+        animal_reproductive_condition = str_trim(animal_reproductive_condition),
+        animal_reproductive_condition = str_replace_all(animal_reproductive_condition, "\\s+", ""),
+        animal_reproductive_condition = str_extract(animal_reproductive_condition, "^[^|]+"),
+        animal_reproductive_condition = str_replace(animal_reproductive_condition, "–", "-"))
+    
+    # Get unique conditions after cleaning
+    unique_conditions <- sort(unique(summary_table$animal_reproductive_condition))
+    n_conditions <- length(unique_conditions)
+    
+    logger.info(sprintf("%d reproductive conditions detected after cleaning: %s", n_conditions, 
+                        paste(unique_conditions, collapse = ", ")),
+                call. = FALSE, immediate. = TRUE)
+    
+    n_lost <- n_original - nrow(summary_table)
+    if (n_lost > 0) {
+      logger.warn(sprintf("%d individuals with NA reproductive conditions removed from study.", n_lost),
+              call. = FALSE, immediate. = TRUE)
+    }
+  }
+  
+  if(group_comparsion_individual == "attachment"){
+    
+    # Clean data, remove NAs 
+    n_original <- nrow(summary_table)
+    summary_table <- summary_table %>%
+      filter(!is.na(attachment_type)) %>%
+      mutate(
+        attachment = str_trim(attachment_type),
+        attachment = str_replace_all(attachment_type, "\\s+", ""),
+        attachment = str_extract(attachment_type, "^[^|]+"),
+        attachment = str_replace(attachment_type, "–", "-"))
+    
+    n_attaches <- length(unique(summary_table$attachment))
+    logger.info(sprintf("%d attachment types detected.", n_attaches), call. = FALSE, immediate. = TRUE)
+    
+    n_lost <- n_original - nrow(summary_table)
+    if (n_lost > 0) {
+      logger.warn(sprintf("%d individuals with NA attachment type removed from study.", n_lost), 
+              call. = FALSE, immediate. = TRUE)
+    }
+  } 
+  
+  
+  ## Basic summaries of data --------------------------------------------------
+  
+  # Plot each individual's tracking history (across entire dataset) --- 
+  deployment_to_ind <- mt_track_data(data) |>
+    dplyr::select(deployment_id, individual_id) |>
+    distinct()
+  
+  data_with_ind <- data |>
+    mt_as_event_attribute(c("individual_id", "deployment_id"), .keep = FALSE)
+  
+  track_times <- data_with_ind |>
+    group_by(individual_id) |>
+    summarise(
+      start     = min(timestamp, na.rm = TRUE),
+      end       = max(timestamp, na.rm = TRUE),
+      n_locs    = n(),
+      n_deploy  = n_distinct(deployment_id),     
+      .groups   = "drop"
+    ) |>
+    left_join(
+      mt_track_data(data) |>
+        distinct(individual_id, .keep_all = TRUE),
+      by = "individual_id"
+    ) |>
+    mutate(
+      duration_days = round(as.numeric(difftime(end, start, units = "days")), 1),
+      track_label   = fct_reorder(as.character(individual_id), start)
+    ) |>
+    arrange(start)
+  
+  (tracking_history <- ggplot(track_times) +
+      geom_segment(aes(x = start, xend = end, y = track_label, yend = track_label),
+                   linewidth = 3, color = "steelblue") +
+      geom_point(aes(x = start, y = track_label), color = "darkgreen", size = 3.5) +
+      geom_point(aes(x = end,   y = track_label), color = "firebrick",  size = 3.5) +
+      labs(title    = "Individual Tracking History (Full Data)",
+           subtitle = sprintf("%d unique individuals • %d total deployments • %d locations",
+                              nrow(track_times),
+                              sum(track_times$n_deploy, na.rm = TRUE),
+                              sum(track_times$n_locs, na.rm = TRUE)),
+           x = "Time",
+           y = "Individual ID") +
+      theme_minimal(base_size = 12) +
+      theme(axis.text.y = element_text(size = 8),
+            panel.grid.major.y = element_blank(),
+            panel.grid.minor = element_blank(),
+            plot.title   = element_text(face = "bold", size = 14), 
+            plot.subtitle = element_text(size = 12, color = "grey50"), 
+            axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
+      scale_x_datetime(date_breaks = "1 year",
+                       date_labels = "%Y"))
+  
+  # want to figure out how to add width, height, units, dpi, bg to artifact 
+  artifact <- appArtifactPath("tracking_history_full.png")
+  logger.info(paste("Saving tracking history (full) plot:", artifact))
+  png(artifact)
+  tracking_history
+  dev.off()
+
+  # Plot each individual's tracking history (during study period) ---
+  track_times <- summary_table %>%
+    mutate(start         = first_timestamp,
+           end           = last_timestamp,
+           duration_days = round(as.numeric(difftime(end, start, units = "days")), 1),
+           track_label   = fct_reorder(as.character(individual_id), start)) %>%
+    arrange(start)
+  
+  (tracking_history_subset <- ggplot(track_times) +
+      geom_segment(aes(x = start, xend = end, y = track_label, yend = track_label),
+                   linewidth = 3, color = "steelblue") +
+      geom_point(aes(x = start, y = track_label),
+                 color = "darkgreen", size = 3.5) +
+      geom_point(aes(x = end, y = track_label),
+                 color = "firebrick", size = 3.5) +
+      labs(title = "Individual Tracking History (Data Subset)",
+           subtitle = sprintf("%d unique individuals • %d total deployments • %d locations",
+                              nrow(track_times),
+                              sum(track_times$n_deploy, na.rm = TRUE),
+                              sum(track_times$n_locations, na.rm = TRUE)),  
+           x = "Time",
+           y = "Individual ID") +
+      theme_minimal(base_size = 12) +
+      theme(axis.text.y = element_text(size = 8),
+            panel.grid.major.y = element_blank(),
+            panel.grid.minor = element_blank(),
+            plot.title   = element_text(face = "bold", size = 14), 
+            plot.subtitle = element_text(size = 12, color = "grey50"), 
+            axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
+      scale_x_datetime(date_breaks = "1 year",
+                       date_labels = "%Y")) 
+  
+  
+  # want to figure out how to add width, height, units, dpi, bg to artifact 
+  artifact <- appArtifactPath("tracking_history_cropped.png")
+  logger.info(paste("Saving tracking history (cropped) plot:", artifact))
+  png(artifact)
+  tracking_history_subset
+  dev.off()
+  
+  
+  ## Survival Analysis ----------------------------------------------------------
+  
+  ## Fit Kaplan-Meier with staggered entry --- 
+  km_fit <- survfit(Surv(entry_time_days, exit_time_days, mortality_event) ~ 1, 
+                    data = summary_table)
+  
+  
+  ## Life table --- 
+  times <- round(seq(min(summary_table$entry_time_days), max(summary_table$exit_time_days), 
+                     length.out = 10))
+  s <- summary(km_fit, times = times)
+  life_table <- data.frame(time_days        = s$time,
+                           n_risk           = s$n.risk,
+                           n_event          = s$n.event,
+                           survival_prob    = s$surv,
+                           std_err          = s$std.err,
+                           lower_95         = s$lower,
+                           upper_95         = s$upper)
+  
+  # unsure if the row.names will cause issues - double check 
+  write.csv(life_table, file = appArtifactPath("life_table.csv", row.names = F))
+  
+  
+  ## KM Survival Curve ---
+  km_summary <- summary(km_fit)
+  km_df <- data.frame(time    = km_summary$time,
+                      surv    = km_summary$surv,    
+                      n_risk  = km_summary$n.risk,   
+                      n_event = km_summary$n.event,  
+                      lower   = km_summary$lower,   
+                      upper   = km_summary$upper,  
+                      std_err = km_summary$std.err)
+  n.ind <- nrow(summary_table)
+  n.events <- nrow(summary_table[summary_table$survival_event == 1,])
+  n.days <- as.numeric(summary(km_fit)$table["median"])
+  
+  (km_curve <- ggplot(km_df, aes(x = time, y = surv)) +
+      geom_ribbon(aes(ymin = lower, ymax = upper), fill = "#AED6F1", alpha = 0.4) +
+      geom_step(linewidth = 1, color = "#21618C") +
+      scale_x_continuous(breaks = seq(0, max(km_df$time, na.rm = TRUE), by = 200),
+                         expand = c(0, 0)) +
+      scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1),
+                         expand = c(0, 0)) +
+      labs(title    = "Kaplan-Meier Survival Curve",
+           subtitle = paste0("N = ", n.ind, ", Events = ", n.events, ", Median Survival =", 
+                             n.days),
+           x        = "Time (days)",
+           y        = "Survival Probability",
+           caption  = "95% Confidence Interval Shaded") +
+      theme_classic(base_size = 12) +
+      theme(plot.title   = element_text(face = "bold", size = 14), 
+            plot.subtitle = element_text(size = 12, color = "gray50"),
+            axis.text    = element_text(color = "black"),
+            panel.grid.major.y = element_line(color = "gray90"), 
+            panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+            plot.margin  = margin(10, 10, 10, 10)))
+
+  
   
   
   
