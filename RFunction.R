@@ -641,55 +641,57 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
   
   
   ## Calculate monthly mortality:
-  mortality_data <- summary_table %>%
-    filter(mortality_event == 1) %>%
-    mutate(death_date  = as.Date(deploy_off_timestamp),
-           death_year  = year(death_date),
-           death_month = month(death_date, label = TRUE, abbr = TRUE),
-           death_month = factor(death_month, levels = month.abb, ordered = TRUE)) %>%
-    dplyr::select(death_year, death_month)
-  
-  monthly_morts <- mortality_data %>%
-    count(death_year, death_month, name = "n_mortalities") %>%
-    complete(death_year = seq(min(death_year, na.rm = TRUE),
-                              max(death_year, na.rm = TRUE)),
-             death_month = factor(month.abb, levels = month.abb, ordered = TRUE),
-             fill = list(n_mortalities = 0)) %>%
-    mutate(death_month_num = as.integer(death_month),   
-           death_month     = fct_relevel(death_month, month.abb))
-  
-  # Plot
-  monthly_mort <- ggplot(monthly_morts, aes(x = death_month, y = factor(death_year), fill = n_mortalities)) +
-    geom_tile(color = "white", linewidth = 0.5) +
-    scale_fill_viridis_c(option    = "magma",
-                         direction = -1,
-                         begin     = 0.1,
-                         na.value  = "grey92",
-                         name      = "Number of\nmortality events") +
-    scale_x_discrete(position = "top") +
-    labs(title    = "Monthly Distribution of Confirmed Mortality Events",
-         subtitle = paste0("Total events: ", sum(monthly_morts$n_mortalities), 
-                           " • Time span: ", format(min(summary_table$deploy_on_timestamp), "%b %Y"), 
-                           " to ", format(max(summary_table$deploy_off_timestamp), "%b %Y")),
-         x        = NULL,
-         y        = "Year") +
-    theme_minimal(base_size = 14) +
-    theme(panel.grid       = element_blank(),
-          axis.ticks       = element_blank(),
-          legend.position  = "right",
-          legend.title     = element_text(size = 11),
-          legend.text      = element_text(size = 10),
-          plot.title       = element_text(face = "bold", hjust = 0.5, size = 16),
-          plot.subtitle    = element_text(hjust = 0.5, size = 12),
-          axis.text.x      = element_text(size = 11, face = "bold"),
-          axis.text.y      = element_text(size = 11))
-  
-  # want to figure out how to add width, height, units, dpi, bg to artifact 
-  artifact <- appArtifactPath("monthly_mortality.png")
-  logger.info(paste("Saving monthly mortality plot:", artifact))
-  png(artifact)
-  monthly_mort
-  dev.off()
+  if(calc_month_mort == "TRUE"){
+    mortality_data <- summary_table %>%
+      filter(mortality_event == 1) %>%
+      mutate(death_date  = as.Date(deploy_off_timestamp),
+             death_year  = year(death_date),
+             death_month = month(death_date, label = TRUE, abbr = TRUE),
+             death_month = factor(death_month, levels = month.abb, ordered = TRUE)) %>%
+      dplyr::select(death_year, death_month)
+    
+    monthly_morts <- mortality_data %>%
+      count(death_year, death_month, name = "n_mortalities") %>%
+      complete(death_year = seq(min(death_year, na.rm = TRUE),
+                                max(death_year, na.rm = TRUE)),
+               death_month = factor(month.abb, levels = month.abb, ordered = TRUE),
+               fill = list(n_mortalities = 0)) %>%
+      mutate(death_month_num = as.integer(death_month),   
+             death_month     = fct_relevel(death_month, month.abb))
+    
+    # Plot
+    monthly_mort <- ggplot(monthly_morts, aes(x = death_month, y = factor(death_year), fill = n_mortalities)) +
+      geom_tile(color = "white", linewidth = 0.5) +
+      scale_fill_viridis_c(option    = "magma",
+                           direction = -1,
+                           begin     = 0.1,
+                           na.value  = "grey92",
+                           name      = "Number of\nmortality events") +
+      scale_x_discrete(position = "top") +
+      labs(title    = "Monthly Distribution of Confirmed Mortality Events",
+           subtitle = paste0("Total events: ", sum(monthly_morts$n_mortalities), 
+                             " • Time span: ", format(min(summary_table$deploy_on_timestamp), "%b %Y"), 
+                             " to ", format(max(summary_table$deploy_off_timestamp), "%b %Y")),
+           x        = NULL,
+           y        = "Year") +
+      theme_minimal(base_size = 14) +
+      theme(panel.grid       = element_blank(),
+            axis.ticks       = element_blank(),
+            legend.position  = "right",
+            legend.title     = element_text(size = 11),
+            legend.text      = element_text(size = 10),
+            plot.title       = element_text(face = "bold", hjust = 0.5, size = 16),
+            plot.subtitle    = element_text(hjust = 0.5, size = 12),
+            axis.text.x      = element_text(size = 11, face = "bold"),
+            axis.text.y      = element_text(size = 11))
+    
+    # want to figure out how to add width, height, units, dpi, bg to artifact 
+    artifact <- appArtifactPath("monthly_mortality.png")
+    logger.info(paste("Saving monthly mortality plot:", artifact))
+    png(artifact)
+    monthly_mort
+    dev.off()
+  }
   
   
   ## Survival Analysis ----------------------------------------------------------

@@ -96,6 +96,20 @@
       "defaultValue": 30,
       "type": "INTEGER"
     }, 
+    {
+      "id": "calc_month_mort",
+      "name": "Plot monthly mortality",
+      "description": "Select an option.",
+      "defaultValue": FALSE,
+      "type": "RADIOBUTTONS",
+      "options": [{
+        "value": FALSE,
+        "displayText": "Do not plot monthly mortality"
+        },
+        {
+          "value": TRUE,
+          "displayText": "Plot monthly mortality"}]
+          },
   ],
   "dependencies": {
     "R": [
