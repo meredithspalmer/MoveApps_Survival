@@ -88,7 +88,14 @@
           "displayText": "Attachment type"
         }
       ]
-    }
+    }, 
+    {
+      "id": "life_table_days",
+      "name": "Generate periods for life table",
+      "description": "Define how often to calculate survival probabilities for the life tabel (e.g., every 30 days).",
+      "defaultValue": 30,
+      "type": "INTEGER"
+    }, 
   ],
   "dependencies": {
     "R": [
@@ -100,7 +107,8 @@
       {"name": "lubridate"},
       {"name": "stringr"},
       {"name": "sf"},
-      {"name": "forecats"}
+      {"name": "forecats"}, 
+      {"name": "tidyr"}
     ]
   },
   "license": {
@@ -121,26 +129,6 @@
       "roles": ["author", "creator", "contractor"],
       "orcid": "0000-0002-1416-1732",
       "affiliation": "Yale University", 
-      "affiliationRor": null
-    }, 
-    {
-      "firstName": "Jasmine",
-      "middleInitials": null,
-      "lastName": "Ware",
-      "email": "Jasmine.Ware@yukon.ca",
-      "roles": ["contributor", "funder"],
-      "orcid": null,
-      "affiliation": "Government of Yukon",
-      "affiliationRor": null
-    }, 
-    {
-      "firstName": "Mike",
-      "middleInitials": null,
-      "lastName": "Suitor",
-      "email": "Mike.Suitor@yukon.ca",
-      "roles": ["contributor", "funder"],
-      "orcid": null,
-      "affiliation": "Government of Yukon", 
       "affiliationRor": null
     }
   ],

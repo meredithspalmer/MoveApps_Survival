@@ -7,6 +7,7 @@ library(lubridate)
 library(stringr)
 library(sf)
 library(forcats)
+library(tidyr)
 
 # logger.fatal(), logger.error(), logger.warn(), logger.info(), logger.debug(), logger.trace()
 
@@ -569,7 +570,7 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
     ) |>
     arrange(start)
   
-  (tracking_history <- ggplot(track_times) +
+  tracking_history <- ggplot(track_times) +
       geom_segment(aes(x = start, xend = end, y = track_label, yend = track_label),
                    linewidth = 3, color = "steelblue") +
       geom_point(aes(x = start, y = track_label), color = "darkgreen", size = 3.5) +
@@ -589,7 +590,7 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
             plot.subtitle = element_text(size = 12, color = "grey50"), 
             axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
       scale_x_datetime(date_breaks = "1 year",
-                       date_labels = "%Y"))
+                       date_labels = "%Y")
   
   # want to figure out how to add width, height, units, dpi, bg to artifact 
   artifact <- appArtifactPath("tracking_history_full.png")
@@ -606,7 +607,7 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
            track_label   = fct_reorder(as.character(individual_id), start)) %>%
     arrange(start)
   
-  (tracking_history_subset <- ggplot(track_times) +
+  tracking_history_subset <- ggplot(track_times) +
       geom_segment(aes(x = start, xend = end, y = track_label, yend = track_label),
                    linewidth = 3, color = "steelblue") +
       geom_point(aes(x = start, y = track_label),
@@ -628,7 +629,7 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
             plot.subtitle = element_text(size = 12, color = "grey50"), 
             axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
       scale_x_datetime(date_breaks = "1 year",
-                       date_labels = "%Y")) 
+                       date_labels = "%Y")
   
   
   # want to figure out how to add width, height, units, dpi, bg to artifact 
@@ -636,6 +637,58 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
   logger.info(paste("Saving tracking history (cropped) plot:", artifact))
   png(artifact)
   tracking_history_subset
+  dev.off()
+  
+  
+  ## Calculate monthly mortality:
+  mortality_data <- summary_table %>%
+    filter(mortality_event == 1) %>%
+    mutate(death_date  = as.Date(deploy_off_timestamp),
+           death_year  = year(death_date),
+           death_month = month(death_date, label = TRUE, abbr = TRUE),
+           death_month = factor(death_month, levels = month.abb, ordered = TRUE)) %>%
+    dplyr::select(death_year, death_month)
+  
+  monthly_morts <- mortality_data %>%
+    count(death_year, death_month, name = "n_mortalities") %>%
+    complete(death_year = seq(min(death_year, na.rm = TRUE),
+                              max(death_year, na.rm = TRUE)),
+             death_month = factor(month.abb, levels = month.abb, ordered = TRUE),
+             fill = list(n_mortalities = 0)) %>%
+    mutate(death_month_num = as.integer(death_month),   
+           death_month     = fct_relevel(death_month, month.abb))
+  
+  # Plot
+  monthly_mort <- ggplot(monthly_morts, aes(x = death_month, y = factor(death_year), fill = n_mortalities)) +
+    geom_tile(color = "white", linewidth = 0.5) +
+    scale_fill_viridis_c(option    = "magma",
+                         direction = -1,
+                         begin     = 0.1,
+                         na.value  = "grey92",
+                         name      = "Number of\nmortality events") +
+    scale_x_discrete(position = "top") +
+    labs(title    = "Monthly Distribution of Confirmed Mortality Events",
+         subtitle = paste0("Total events: ", sum(monthly_morts$n_mortalities), 
+                           " • Time span: ", format(min(summary_table$deploy_on_timestamp), "%b %Y"), 
+                           " to ", format(max(summary_table$deploy_off_timestamp), "%b %Y")),
+         x        = NULL,
+         y        = "Year") +
+    theme_minimal(base_size = 14) +
+    theme(panel.grid       = element_blank(),
+          axis.ticks       = element_blank(),
+          legend.position  = "right",
+          legend.title     = element_text(size = 11),
+          legend.text      = element_text(size = 10),
+          plot.title       = element_text(face = "bold", hjust = 0.5, size = 16),
+          plot.subtitle    = element_text(hjust = 0.5, size = 12),
+          axis.text.x      = element_text(size = 11, face = "bold"),
+          axis.text.y      = element_text(size = 11))
+  
+  # want to figure out how to add width, height, units, dpi, bg to artifact 
+  artifact <- appArtifactPath("monthly_mortality.png")
+  logger.info(paste("Saving monthly mortality plot:", artifact))
+  png(artifact)
+  monthly_mort
   dev.off()
   
   
@@ -647,8 +700,9 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
   
   
   ## Life table --- 
+  lt.length.out <- ceiling(max(summary_table$exit_time_days)/life_table_days)
   times <- round(seq(min(summary_table$entry_time_days), max(summary_table$exit_time_days), 
-                     length.out = 10))
+                     length.out = lt.length.out))
   s <- summary(km_fit, times = times)
   life_table <- data.frame(time_days        = s$time,
                            n_risk           = s$n.risk,
@@ -746,6 +800,7 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
     surv_formula <- as.formula(formula_str)
     km_fit_comp <- survfit(surv_formula, data = summary_table)
     
+    
     ## Log-Rank test --- 
     test <- survdiff(surv_formula, data=summary_table)
     
@@ -781,13 +836,65 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
     # double check that adding row.names = F doesn't cause issues 
     write.csv(logrank_table, file = appArtifactPath("logrank_table_statistics.csv", row.names = F))
     
-    ## Comparison plots ---
     
-      
+    ## Comparison plots ---
+    km_fit_comp <- surv_fit(surv_formula, data = summary_table)  # use surv_fit instead of survfit
+    
+    # Dynamically update comparison variables 
+    grouping_labels <- c("animal_reproductive_condition" = "Reproductive Condition",
+                         "sex"                           = "Sex",
+                         "attachment"                    = "Collar Attachment",
+                         "lifestage"                     = "Life-stage")
+    grouping_var <- grouping_labels[[group_comparison_individual]]
+    if (is.na(grouping_var)) {
+      stop("Unknown grouping variable: ", group_comparison_individual)
+    }
+    title_text <- paste0("Kaplan-Meier Survival Curve: ", grouping_var)
+    subtitle_text <- paste0("N(",logrank_table$`Reproductive condition`[1],"): ", test$n[1], 
+                            ", N(", logrank_table$`Reproductive condition`[2],"): ", test$n[2], 
+                            "\nP-value: ", round(test$pvalue, 3))
+    
+    old_strata_names <- names(km_fit_comp$strata)
+    new_strata_names <- sub(".*=", "", old_strata_names)
+    names(km_fit_comp$strata) <- new_strata_names
+    
+    # Plot 
+    km_comp_curve <- ggsurvplot(km_fit_comp,
+                                data = summary_table,
+                                 title = title_text,
+                                 subtitle = subtitle_text,
+                                 conf.int = TRUE,
+                                 risk.table = TRUE,
+                                 risk.table.title = "Number at risk",
+                                 risk.table.height = 0.18,
+                                 surv.median.line = "hv",
+                                 palette = c("#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD"), 
+                                 xlab = "Days at risk",
+                                 ylab = "Survival probability",
+                                 legend.title = grouping_var,
+                                 legend = "bottom",
+                                 legend.labs = levels(summary_table[[group_comparison_individual]]),
+                                 censor.shape = "|",
+                                 censor.size = 4,
+                                 font.main = c(14, "bold", "black"),
+                                 font.x = 12, font.y = 12, font.tickslab = 11, 
+                                 ggtheme = theme_classic(base_size = 12) +
+                                   theme(
+                                     plot.title   = element_text(face = "bold", size = 14),
+                                     plot.subtitle = element_text(size = 12, color = "gray50"),
+                                     axis.text    = element_text(color = "black"),
+                                     panel.grid.major.y = element_line(color = "gray90"),
+                                     panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+                                     plot.margin  = margin(10, 10, 10, 10)))
+
+    # want to figure out how to add width, height, units, dpi, bg to artifact 
+    artifact <- appArtifactPath("km_comparison_curves.png")
+    logger.info(paste("Saving KM comparison curves:", artifact))
+    png(artifact)
+    km_comp_curve
+    dev.off()
   }
   
-  
- 
   # Pass original to the next app in the MoveApps workflow
   return(data)
 }
