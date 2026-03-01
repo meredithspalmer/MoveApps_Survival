@@ -16,9 +16,11 @@ This app implements fundamental Kaplan-Meier (KM) survival estimation functions.
 - *Right-censoring*, where the exact time of death is unknown for some individuals because they are still alive at the end of the study period, lost to follow-up (e.g., collar failure), or exit the study period alive for other reasons. 
 - *Staggered entry* (also called left truncation or delayed entry), where individuals enter the study at different times rather than all starting at the same baseline. 
 
-**Log-rank Test:** Users can request log-rank tests (Mantel–Cox test) to compare survival distributions across groups. The log-rank test assesses whether there are statistically significant differences in survival between two or more independent groups. Currently supported grouping variables are: sex, life stage, reproductive condition, or tag/collar attachment type. 
+**KM Survival Curves:** These plots depict the estimated probability of survival (e.g., remaining mortality-free) over time. They include visual representations of when events occur. 
 
-**Cumulative Hazard Plots:** This plot depicts the the total accumulated risk (e.g., the expected number of mortalities) the population has experienced up to a specific time.
+**Cumulative Hazard Plots:** These plots depict the the total accumulated risk (e.g., the expected number of mortalities) the population has experienced up to a specific time.
+
+**Log-rank Test:** Users can request log-rank tests (Mantel–Cox test) to compare survival distributions across groups. The log-rank test assesses whether there are statistically significant differences in survival between two or more independent groups. Currently supported grouping variables are: sex, life stage, reproductive condition, or tag/collar attachment type. 
 
 Users define a study period, can censor data to exclude post-capture mortality events, and specify how to handle missing timestamp information.
 
