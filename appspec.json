@@ -110,6 +110,20 @@
           "value": TRUE,
           "displayText": "Plot monthly mortality"}]
           },
+    {
+      "id": "add_risk_table",
+      "name": "Add risk and cumulative events tables to KM and hazard plots",
+      "description": "Select an option.",
+      "defaultValue": FALSE,
+      "type": "RADIOBUTTONS",
+      "options": [{
+        "value": FALSE,
+        "displayText": "Do not add risk/events tables."
+        },
+        {
+          "value": TRUE,
+          "displayText": "Add risk/events tables."}]
+          },  
   ],
   "dependencies": {
     "R": [

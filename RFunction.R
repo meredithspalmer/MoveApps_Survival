@@ -542,101 +542,113 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
   
   ## Basic summaries of data --------------------------------------------------
   
-  # Plot each individual's tracking history (across entire dataset) --- 
-  deployment_to_ind <- mt_track_data(data) |>
-    dplyr::select(deployment_id, individual_id) |>
-    distinct()
+  # Plot each individual's tracking history --- 
   
-  data_with_ind <- data |>
-    mt_as_event_attribute(c("individual_id", "deployment_id"), .keep = FALSE)
+  # Summarize per-deployment information
+  deployment_summary <- mt_track_data(data) |>
+    dplyr::select(deployment_id,
+                  individual_id,
+                  deploy_on  = deploy_on_timestamp,
+                  deploy_off = deploy_off_timestamp) |>
+    distinct() |>
+    mutate(deploy_on = as.POSIXct(deploy_on),
+           deploy_off     = as.POSIXct(deploy_off),
+           duration_days  = round(as.numeric(difftime(deploy_off, deploy_on, units = "days")), 1)) |>
+    filter(deploy_off > deploy_on, !is.na(deploy_on), !is.na(deploy_off))
   
-  track_times <- data_with_ind |>
+  has_time_filter <- !is.na(time_period_start) || !is.na(time_period_end)
+  
+  if (has_time_filter) {
+    t_start <- if (!is.na(time_period_start)) as.POSIXct(time_period_start) else min(deployment_summary$deploy_on, na.rm = TRUE)
+    t_end   <- if (!is.na(time_period_end))   as.POSIXct(time_period_end)   else max(deployment_summary$deploy_off, na.rm = TRUE)
+    
+    deployment_summary <- deployment_summary |>
+      mutate(clip_start = pmax(deploy_on,  t_start, na.rm = TRUE),
+             clip_end   = pmin(deploy_off, t_end,   na.rm = TRUE)) |>
+      filter(clip_start < clip_end) |>
+      mutate(plot_start = clip_start,
+             plot_end   = clip_end)
+  } else { 
+    deployment_summary <- deployment_summary |>
+      mutate(plot_start = deploy_on,
+             plot_end   = deploy_off)
+  }
+  
+  # Sort by start date 
+  first_start <- deployment_summary |>
     group_by(individual_id) |>
-    summarise(
-      start     = min(timestamp, na.rm = TRUE),
-      end       = max(timestamp, na.rm = TRUE),
-      n_locs    = n(),
-      n_deploy  = n_distinct(deployment_id),     
-      .groups   = "drop"
-    ) |>
-    left_join(
-      mt_track_data(data) |>
-        distinct(individual_id, .keep_all = TRUE),
-      by = "individual_id"
-    ) |>
-    mutate(
-      duration_days = round(as.numeric(difftime(end, start, units = "days")), 1),
-      track_label   = fct_reorder(as.character(individual_id), start)
-    ) |>
-    arrange(start)
+    summarise(first_start = min(plot_start, na.rm = TRUE), .groups = "drop")
   
-  tracking_history <- ggplot(track_times) +
-      geom_segment(aes(x = start, xend = end, y = track_label, yend = track_label),
-                   linewidth = 3, color = "steelblue") +
-      geom_point(aes(x = start, y = track_label), color = "darkgreen", size = 3.5) +
-      geom_point(aes(x = end,   y = track_label), color = "firebrick",  size = 3.5) +
-      labs(title    = "Individual Tracking History (Full Data)",
-           subtitle = sprintf("%d unique individuals • %d total deployments • %d locations",
-                              nrow(track_times),
-                              sum(track_times$n_deploy, na.rm = TRUE),
-                              sum(track_times$n_locs, na.rm = TRUE)),
+  deployment_summary <- deployment_summary |>
+    left_join(first_start, by = "individual_id") |>
+    mutate(individual_label = fct_reorder(as.character(individual_id), first_start)) |>
+    arrange(first_start, plot_start)
+  
+  # Total location count 
+  n_locs_total <- if (exists("n_locations", mode = "function")) {
+    n_locations(data)
+  } else {
+    nrow(data)
+  }
+  
+  # Plot
+  title_suffix <- if (has_time_filter) {
+    paste0(" (", format(t_start, "%b %Y"), " – ", format(t_end, "%b %Y"), ")")
+  } else {
+    ""
+  }
+  
+  tracking_history <- ggplot(deployment_summary) +
+      geom_segment(aes(x = plot_start, xend = plot_end,
+                       y = individual_label, yend = individual_label),
+                   linewidth = 3.2,
+                   color = "steelblue") +
+      geom_point(aes(x = plot_start, y = individual_label),
+                 color = "darkgreen", size = 3.5) +
+      geom_point(aes(x = plot_end, y = individual_label),
+                 color = "firebrick", size = 3.5) +
+      geom_segment(data = deployment_summary |>
+                     group_by(individual_label) |>
+                     arrange(plot_start) |>
+                     mutate(
+                       prev_end  = lag(plot_end),
+                       gap_start = prev_end,
+                       gap_end   = plot_start,
+                       gap_days  = as.numeric(difftime(gap_end, gap_start, units = "days"))) |>
+                     filter(gap_days > 30, !is.na(gap_days)),
+                   aes(x    = gap_start + (gap_end - gap_start)/2,
+                       xend = gap_start + (gap_end - gap_start)/2,
+                       y    = as.numeric(individual_label),
+                       yend = as.numeric(individual_label) + 0.45),
+                   color     = "grey50",
+                   linewidth = 1.2,
+                   arrow     = arrow(length = unit(0.18, "cm"), type = "closed")) +
+      labs(title    = paste0("Individual Collared Periods", title_suffix),
+           subtitle = sprintf("%d unique individuals • %d visible deployments • %d locations",
+                              n_distinct(deployment_summary$individual_id),
+                              nrow(deployment_summary),
+                              n_locs_total),
            x = "Time",
            y = "Individual ID") +
       theme_minimal(base_size = 12) +
-      theme(axis.text.y = element_text(size = 8),
+      theme(axis.text.y       = element_text(size = 8, face = "plain"),
             panel.grid.major.y = element_blank(),
-            panel.grid.minor = element_blank(),
-            plot.title   = element_text(face = "bold", size = 14), 
-            plot.subtitle = element_text(size = 12, color = "grey50"), 
-            axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
-      scale_x_datetime(date_breaks = "1 year",
-                       date_labels = "%Y")
+            panel.grid.minor   = element_blank(),
+            plot.title        = element_text(face = "bold", size = 14),
+            plot.subtitle     = element_text(size = 11, color = "grey50", margin = margin(b = 10)),
+            axis.text.x       = element_text(angle = 45, hjust = 1, vjust = 1),
+            axis.title        = element_text(size = 12)) +
+      scale_x_datetime(date_breaks  = "1 year",
+                       date_labels  = "%Y",
+                       expand       = expansion(mult = c(0.01, 0.03)),
+                       limits       = if (has_time_filter) c(t_start, t_end) else NULL)
+  
   
   # want to figure out how to add width, height, units, dpi, bg to artifact 
-  artifact <- appArtifactPath("tracking_history_full.png")
-  logger.info(paste("Saving tracking history (full) plot:", artifact))
+  artifact <- appArtifactPath("tracking_history.png")
+  logger.info(paste("Saving tracking history plot:", artifact))
   png(artifact)
   tracking_history
-  dev.off()
-
-  # Plot each individual's tracking history (during study period) ---
-  track_times <- summary_table %>%
-    mutate(start         = first_timestamp,
-           end           = last_timestamp,
-           duration_days = round(as.numeric(difftime(end, start, units = "days")), 1),
-           track_label   = fct_reorder(as.character(individual_id), start)) %>%
-    arrange(start)
-  
-  tracking_history_subset <- ggplot(track_times) +
-      geom_segment(aes(x = start, xend = end, y = track_label, yend = track_label),
-                   linewidth = 3, color = "steelblue") +
-      geom_point(aes(x = start, y = track_label),
-                 color = "darkgreen", size = 3.5) +
-      geom_point(aes(x = end, y = track_label),
-                 color = "firebrick", size = 3.5) +
-      labs(title = "Individual Tracking History (Data Subset)",
-           subtitle = sprintf("%d unique individuals • %d total deployments • %d locations",
-                              nrow(track_times),
-                              sum(track_times$n_deploy, na.rm = TRUE),
-                              sum(track_times$n_locations, na.rm = TRUE)),  
-           x = "Time",
-           y = "Individual ID") +
-      theme_minimal(base_size = 12) +
-      theme(axis.text.y = element_text(size = 8),
-            panel.grid.major.y = element_blank(),
-            panel.grid.minor = element_blank(),
-            plot.title   = element_text(face = "bold", size = 14), 
-            plot.subtitle = element_text(size = 12, color = "grey50"), 
-            axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
-      scale_x_datetime(date_breaks = "1 year",
-                       date_labels = "%Y")
-  
-  
-  # want to figure out how to add width, height, units, dpi, bg to artifact 
-  artifact <- appArtifactPath("tracking_history_cropped.png")
-  logger.info(paste("Saving tracking history (cropped) plot:", artifact))
-  png(artifact)
-  tracking_history_subset
   dev.off()
   
   
@@ -725,34 +737,62 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
   
   
   ## KM Survival Curve ---
-  km_curve <- ggsurvplot(
-    km_fit,
-    data = summary_table,
-    title = "Kaplan-Meier Survival Curve",
-    subtitle = paste0("N = ", n.ind, ", Events = ", n.events, ", Median Survival = ", 
-                      med$median, " days"),
-    xlab = "Time (days)",
-    ylab = "Survival Probability",
-    risk.table = TRUE,
-    risk.table.col = "strata",
-    risk.table.title = "Number at Risk",
-    risk.table.y.text = FALSE,     
-    risk.table.height = 0.18,
-    conf.int = TRUE,
-    censor.shape = "|",
-    censor.size = 3,
-    legend = "none",
-    pval = TRUE,
-    surv.median.line = "hv",        
-    palette = c("#E69F00", "#56B4E9"),
-    ggtheme = theme_classic(base_size = 12) + 
-      theme(plot.title         = element_text(face = "bold", size = 14), 
-            plot.subtitle      = element_text(size = 12, color = "gray50"),
-            axis.text          = element_text(color = "black"),
-            panel.grid.major.y = element_line(color = "gray90"), 
-            panel.border       = element_rect(color = "black", fill = NA, linewidth = 0.5),
-            plot.margin        = margin(10, 10, 10, 10)))
-          
+  med <- survminer::surv_median(km_fit)
+  
+  if(add_risk_table == TRUE){
+    km_curve <- ggsurvplot(
+      km_fit,
+      data = summary_table,
+      title = "Kaplan-Meier Survival Curve",
+      subtitle = paste0("N = ", n.ind, ", Events = ", n.events, ", Median Survival = ", 
+                        med$median, " days"),
+      xlab = "Time (days)",
+      ylab = "Survival Probability",
+      risk.table = TRUE,
+      risk.table.col = "strata",
+      risk.table.title = "Number at Risk",
+      risk.table.y.text = FALSE,     
+      risk.table.height = 0.18,
+      conf.int = TRUE,
+      censor.shape = "|",
+      censor.size = 3,
+      legend = "none",
+      pval = TRUE,
+      surv.median.line = "hv",        
+      palette = c("#E69F00", "#56B4E9"),
+      ggtheme = theme_classic(base_size = 12) + 
+        theme(plot.title         = element_text(face = "bold", size = 14), 
+              plot.subtitle      = element_text(size = 12, color = "gray50"),
+              axis.text          = element_text(color = "black"),
+              panel.grid.major.y = element_line(color = "gray90"), 
+              panel.border       = element_rect(color = "black", fill = NA, linewidth = 0.5),
+              plot.margin        = margin(10, 10, 10, 10)))
+  } else {
+    km_curve <- ggsurvplot(
+      km_fit,
+      data = summary_table,
+      title = "Kaplan-Meier Survival Curve",
+      subtitle = paste0("N = ", n.ind, ", Events = ", n.events, ", Median Survival = ", 
+                        med$median, " days"),
+      xlab = "Time (days)",
+      ylab = "Survival Probability",
+      risk.table = FALSE,
+      conf.int = TRUE,
+      censor.shape = "|",
+      censor.size = 3,
+      legend = "none",
+      pval = TRUE,
+      surv.median.line = "hv",        
+      palette = c("#E69F00", "#56B4E9"),
+      ggtheme = theme_classic(base_size = 12) + 
+        theme(plot.title         = element_text(face = "bold", size = 14), 
+              plot.subtitle      = element_text(size = 12, color = "gray50"),
+              axis.text          = element_text(color = "black"),
+              panel.grid.major.y = element_line(color = "gray90"), 
+              panel.border       = element_rect(color = "black", fill = NA, linewidth = 0.5),
+              plot.margin        = margin(10, 10, 10, 10)))
+  }
+  
   # want to figure out how to add width, height, units, dpi, bg to artifact 
   artifact <- appArtifactPath("km_survival_curve.png")
   logger.info(paste("Saving Kaplan-Meier survival curve plot:", artifact))
@@ -762,28 +802,51 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
   
   
   ## Cumulative hazard plot ----
-  cum_hazard <- ggsurvplot(
-    km_fit,
-    fun = "cumhaz",
-    conf.int = TRUE,
-    risk.table = TRUE,
-    cumevents = TRUE,                 
-    tables.height = 0.18,              
-    tables.y.text = FALSE,            
-    surv.median.line = "hv",         
-    pval = TRUE,                     
-    xlab = "Time (days)",
-    ylab = "Cumulative Hazard",
-    title = "Cumulative Hazard",
-    subtitle = paste0("N = ", n.ind, ", Events = ", n.events), #update events 
-    palette = c("#E69F00", "#56B4E9"),
-    ggtheme = theme_classic(base_size = 12) + 
-      theme(plot.title   = element_text(face = "bold", size = 14), 
-            plot.subtitle = element_text(size = 12, color = "gray50"),
-            axis.text    = element_text(color = "black"),
-            panel.grid.major.y = element_line(color = "gray90"), 
-            panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
-            plot.margin  = margin(10, 10, 10, 10)))
+  if(add_risk_table == TRUE){
+    cum_hazard <- ggsurvplot(
+      km_fit,
+      fun = "cumhaz",
+      conf.int = TRUE,
+      risk.table = TRUE,
+      cumevents = TRUE,                 
+      tables.height = 0.18,              
+      tables.y.text = FALSE,            
+      surv.median.line = "hv",         
+      pval = TRUE,                     
+      xlab = "Time (days)",
+      ylab = "Cumulative Hazard",
+      title = "Cumulative Hazard",
+      subtitle = paste0("N = ", n.ind, ", Events = ", n.events), #update events 
+      palette = c("#E69F00", "#56B4E9"),
+      ggtheme = theme_classic(base_size = 12) + 
+        theme(plot.title   = element_text(face = "bold", size = 14), 
+              plot.subtitle = element_text(size = 12, color = "gray50"),
+              axis.text    = element_text(color = "black"),
+              panel.grid.major.y = element_line(color = "gray90"), 
+              panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+              plot.margin  = margin(10, 10, 10, 10)))
+  } else {
+    cum_hazard <- ggsurvplot(
+      km_fit,
+      fun = "cumhaz",
+      conf.int = TRUE,
+      risk.table = FALSE,
+      cumevents = FALSE,                 
+      surv.median.line = "hv",         
+      pval = TRUE,                     
+      xlab = "Time (days)",
+      ylab = "Cumulative Hazard",
+      title = "Cumulative Hazard",
+      subtitle = paste0("N = ", n.ind, ", Events = ", n.events), #update events 
+      palette = c("#E69F00", "#56B4E9"),
+      ggtheme = theme_classic(base_size = 12) + 
+        theme(plot.title   = element_text(face = "bold", size = 14), 
+              plot.subtitle = element_text(size = 12, color = "gray50"),
+              axis.text    = element_text(color = "black"),
+              panel.grid.major.y = element_line(color = "gray90"), 
+              panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
+              plot.margin  = margin(10, 10, 10, 10)))
+  }
   
   # want to figure out how to add width, height, units, dpi, bg to artifact 
   artifact <- appArtifactPath("cumulative_hazard_plot.png")
@@ -839,7 +902,7 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
     write.csv(logrank_table, file = appArtifactPath("logrank_table_statistics.csv", row.names = F))
     
     
-    ## Comparison plots ---
+    ## KM comparison plots ---
     km_fit_comp <- surv_fit(surv_formula, data = summary_table)  # use surv_fit instead of survfit
     
     # Dynamically update comparison variables 
@@ -861,40 +924,145 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
     names(km_fit_comp$strata) <- new_strata_names
     
     # Plot 
-    km_comp_curve <- ggsurvplot(km_fit_comp,
-                                data = summary_table,
-                                 title = title_text,
-                                 subtitle = subtitle_text,
-                                 conf.int = TRUE,
-                                 risk.table = TRUE,
-                                 risk.table.title = "Number at risk",
-                                 risk.table.height = 0.18,
-                                 surv.median.line = "hv",
-                                 palette = c("#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD"), 
-                                 xlab = "Days at risk",
-                                 ylab = "Survival probability",
-                                 legend.title = grouping_var,
-                                 legend = "bottom",
-                                 legend.labs = levels(summary_table[[group_comparison_individual]]),
-                                 censor.shape = "|",
-                                 censor.size = 4,
-                                 font.main = c(14, "bold", "black"),
-                                 font.x = 12, font.y = 12, font.tickslab = 11, 
-                                 ggtheme = theme_classic(base_size = 12) +
-                                   theme(
-                                     plot.title   = element_text(face = "bold", size = 14),
-                                     plot.subtitle = element_text(size = 12, color = "gray50"),
-                                     axis.text    = element_text(color = "black"),
-                                     panel.grid.major.y = element_line(color = "gray90"),
-                                     panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5),
-                                     plot.margin  = margin(10, 10, 10, 10)))
-
+    if(add_risk_table == TRUE){
+      km_comp_curve <- ggsurvplot(km_fit_comp,
+                                  data = summary_table,
+                                  title = title_text,
+                                  subtitle = subtitle_text,
+                                  conf.int = TRUE,
+                                  risk.table = TRUE,
+                                  risk.table.title = "Number at risk",
+                                  risk.table.height = 0.18,
+                                  surv.median.line = "hv",
+                                  palette = c("#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD"), 
+                                  xlab = "Days at risk",
+                                  ylab = "Survival probability",
+                                  legend.title = grouping_var,
+                                  legend = "bottom",
+                                  legend.labs = levels(summary_table[[group_comparison_individual]]),
+                                  censor.shape = "|",
+                                  censor.size = 4,
+                                  font.main = c(14, "bold", "black"),
+                                  font.x = 12, font.y = 12, font.tickslab = 11, 
+                                  ggtheme = theme_classic(base_size = 12) +
+                                    theme(
+                                      plot.title   = element_text(face = "bold", size = 14),
+                                      plot.subtitle = element_text(size = 12, color = "gray50"),
+                                      axis.text    = element_text(color = "black"),
+                                      panel.grid.major.y = element_line(color = "gray90"),
+                                      panel.border = element_rect(color="black", fill = NA, linewidth = 0.5),
+                                      plot.margin  = margin(10, 10, 10, 10)))
+    } else {
+      km_comp_curve <- ggsurvplot(km_fit_comp,
+                                  data = summary_table,
+                                  title = title_text,
+                                  subtitle = subtitle_text,
+                                  conf.int = TRUE,
+                                  risk.table = FALSE,
+                                  surv.median.line = "hv",
+                                  palette = c("#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD"), 
+                                  xlab = "Days at risk",
+                                  ylab = "Survival probability",
+                                  legend.title = grouping_var,
+                                  legend = "bottom",
+                                  legend.labs = levels(summary_table[[group_comparison_individual]]),
+                                  censor.shape = "|",
+                                  censor.size = 4,
+                                  font.main = c(14, "bold", "black"),
+                                  font.x = 12, font.y = 12, font.tickslab = 11, 
+                                  ggtheme = theme_classic(base_size = 12) +
+                                    theme(
+                                      plot.title   = element_text(face = "bold", size = 14),
+                                      plot.subtitle = element_text(size = 12, color = "gray50"),
+                                      axis.text    = element_text(color = "black"),
+                                      panel.grid.major.y = element_line(color = "gray90"),
+                                      panel.border = element_rect(color="black", fill = NA, linewidth = 0.5),
+                                      plot.margin  = margin(10, 10, 10, 10)))
+    }
+     
     # want to figure out how to add width, height, units, dpi, bg to artifact 
     artifact <- appArtifactPath("km_comparison_curves.png")
     logger.info(paste("Saving KM comparison curves:", artifact))
     png(artifact)
     km_comp_curve
     dev.off()
+    
+    ## Cumulative hazard comparison plots ---
+    
+    # Prepare statistics for subtitle 
+    n_per_group <- km_fit_comp$n
+    sum_fit <- summary(km_fit_comp)
+    events_per_group <- tapply(sum_fit$n.event, sum_fit$strata, sum, na.rm = TRUE)
+    clean_strata <- gsub("^.*=", "", names(km_fit_comp$strata))
+    subtitle_parts <- mapply(function(group, n, ev) sprintf("N(%s) = %d, Events = %d", group, n, ev),
+                             clean_strata, n_per_group, events_per_group)
+    subtitle_text <- paste(subtitle_parts, collapse = "\n")
+    test <- surv_pvalue(km_fit_comp, data = summary_table)  
+    pval_text <- sprintf("Log-rank p = %.3f", test$pval)
+    cumhaz_subtitle <- paste0(subtitle_text, "\n", pval_text)
+    
+    # Plot 
+    if(add_risk_table == TRUE){
+      cum_hazard <- ggsurvplot(km_fit_comp,
+                               data = summary_table,
+                               fun          = "cumhaz",
+                               conf.int     = TRUE,
+                               censor.shape = "|",
+                               censor.size  = 4,
+                               title        = paste0("Cumulative Hazard by ", grouping_var),
+                               subtitle     = cumhaz_subtitle,   
+                               xlab         = "Days at risk",
+                               ylab         = "Cumulative Hazard",
+                               legend       = "bottom",
+                               legend.title = grouping_var,
+                               legend.labs  = levels(summary_table[[group_comparison_individual]]),
+                               palette      = c("#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD"),
+                               risk.table   = TRUE,
+                               cumevents    = TRUE,
+                               tables.height = 0.18,
+                               tables.y.text = FALSE,
+                               font.main    = c(14, "bold", "black"),
+                               font.x       = 12, font.y = 12, font.tickslab = 11,
+                               ggtheme = theme_classic(base_size = 12) +
+                                 theme(plot.title    = element_text(face = "bold", size = 14),
+                                       plot.subtitle = element_text(size = 12, color = "gray50"),
+                                       axis.text     = element_text(color = "black"),
+                                       panel.grid.major.y = element_line(color = "gray90"),
+                                       panel.border  = element_rect(color = "black", fill=NA, linewidth=0.5),
+                                       plot.margin   = margin(10, 10, 10, 10),
+                                       legend.position = "bottom",
+                                       legend.title  = element_text(size = 11),
+                                       legend.text   = element_text(size = 10)))
+    } else {
+      cum_hazard <- ggsurvplot(km_fit_comp,
+                               data = summary_table,
+                               fun          = "cumhaz",
+                               conf.int     = TRUE,
+                               censor.shape = "|",
+                               censor.size  = 4,
+                               title        = paste0("Cumulative Hazard by ", grouping_var),
+                               subtitle     = cumhaz_subtitle,   
+                               xlab         = "Days at risk",
+                               ylab         = "Cumulative Hazard",
+                               legend       = "bottom",
+                               legend.title = grouping_var,
+                               legend.labs  = levels(summary_table[[group_comparison_individual]]),
+                               palette      = c("#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD"),
+                               risk.table   = FALSE,
+                               cumevents    = FALSE,
+                               font.main    = c(14, "bold", "black"),
+                               font.x       = 12, font.y = 12, font.tickslab = 11,
+                               ggtheme = theme_classic(base_size = 12) +
+                                 theme(plot.title    = element_text(face = "bold", size = 14),
+                                       plot.subtitle = element_text(size = 12, color = "gray50"),
+                                       axis.text     = element_text(color = "black"),
+                                       panel.grid.major.y = element_line(color = "gray90"),
+                                       panel.border  = element_rect(color = "black", fill=NA, linewidth=0.5),
+                                       plot.margin   = margin(10, 10, 10, 10),
+                                       legend.position = "bottom",
+                                       legend.title  = element_text(size = 11),
+                                       legend.text   = element_text(size = 10)))
+    }
   }
   
   # Pass original to the next app in the MoveApps workflow
