@@ -10,13 +10,15 @@ Perform basic Kaplan-Meier survival analyses and optional group comparisons via 
 
 ## Documentation
 
-This app implements fundamental Kaplan-Meier (KM) survival estimation functions. It produces life tables, survival curves, cumulative hazard curves, and, if applicable, statistical comparisons of per-group survival estimation.
+This app implements fundamental Kaplan-Meier (KM) survival estimation functions. It produces life tables, survival curves, cumulative hazard plots, and, if applicable, statistical comparisons of per-group survival estimation.
 
 **Kaplan-Meier Survival Estimation:** The KM estimator is a non-parametric method used to estimate the survival function, that is, the probability that an individual survives past time t, from lifetime data. This analysis allows for:
 - *Right-censoring*, where the exact time of death is unknown for some individuals because they are still alive at the end of the study period, lost to follow-up (e.g., collar failure), or exit the study period alive for other reasons. 
 - *Staggered entry* (also called left truncation or delayed entry), where individuals enter the study at different times rather than all starting at the same baseline. 
 
 **Log-rank Test:** Users can request log-rank tests (Mantel–Cox test) to compare survival distributions across groups. The log-rank test assesses whether there are statistically significant differences in survival between two or more independent groups. Currently supported grouping variables are: sex, life stage, reproductive condition, or tag/collar attachment type. 
+
+**Cumulative Hazard Plots:** DEFINE 
 
 Users define a study period, can censor data to exclude post-capture mortality events, and specify how to handle missing timestamp information.
 
@@ -37,7 +39,8 @@ Finally, the app performs Kaplan-Meier survival estimation on the cleaned datase
 
 When group comparison is enabled, the app additionally produces:  
 - A table of log-rank test results  
-- A comparative survival curve plot contrasting the groups
+- A comparative KM survival curve plot contrasting the groups
+- A comparative cumulative hazard plot contrasting the groups
 
 
 ### Application scope
@@ -74,7 +77,7 @@ Note that a larger sample size is required for comparison across groups,
 
 ### Artefacts
 
-*Tracking history*: Figure (`tracking_history.png`) detailing the start and end dates of each individual across the study and during the tracking period, along with an indicator of how each individual was terminated (death, censored, survived). 
+*Tracking history*: Figure (`tracking_history.png`) detailing the start and end dates of each individual during the tracking period (with gaps in collaring noted), along with an indicator of how each individual was terminated (i.e., death, censored, survived). 
 
 *Life table:* Output of KM survival analysis; table (`life_table.csv`) with the time, number of individuals at risk, number of events, survival, standard error, and upper/lower 95% confidence intervals. 
 
@@ -84,7 +87,9 @@ Note that a larger sample size is required for comparison across groups,
 
 *Log-rank test:* Output of comparing survival curves between groups; table (`logrank_table_statistics.csv`) with test statistics, degrees of freedom, p-value, and pairwise comparisons. 
 
-*Comparison curves:*: Plot (`km_comparison_curves.png`), depicting survival curves by selected group. 
+*Comparison KM curves:* Plot (`km_comparison_curves.png`), depicting survival curves by selected group.
+
+*Comparison hazard plots:* Plot (`cumulative_hazard_comparison_plot.png`), depicting cumulative hazard plots by selected group. 
 
 
 ### Settings 
@@ -103,6 +108,12 @@ Note that a larger sample size is required for comparison across groups,
 - Lifestage 
 - Reproductive condition
 - Attachment type 
+
+`Life table length`: How often to generate statistical output in the life table (e.g., every # days). Default value is 30 days. Unit: `days`. 
+
+`Monthly mortality plots`: Create option plots showcasing monthly mortality across years. Default is no plot. Options are include/exclude. 
+
+`Risk and mortality tables`: Add risk and cumulative events (mortality) tables to the KM and cumulative hazard plots. Default is no plot. Options are include/exclude. 
 
 
 ### Most common errors

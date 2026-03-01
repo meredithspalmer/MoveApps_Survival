@@ -117,13 +117,14 @@
       "defaultValue": FALSE,
       "type": "RADIOBUTTONS",
       "options": [{
-        "value": FALSE,
-        "displayText": "Do not add risk/events tables."
-        },
+          "value": FALSE,
+          "displayText": "Do not add risk/events tables."
+          },
         {
           "value": TRUE,
-          "displayText": "Add risk/events tables."}]
-          },  
+          "displayText": "Add risk/events tables."
+        }]
+    },  
   ],
   "dependencies": {
     "R": [

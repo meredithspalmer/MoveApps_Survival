@@ -1003,7 +1003,7 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
     
     # Plot 
     if(add_risk_table == TRUE){
-      cum_hazard <- ggsurvplot(km_fit_comp,
+      cum_hazard_comp <- ggsurvplot(km_fit_comp,
                                data = summary_table,
                                fun          = "cumhaz",
                                conf.int     = TRUE,
@@ -1034,7 +1034,7 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
                                        legend.title  = element_text(size = 11),
                                        legend.text   = element_text(size = 10)))
     } else {
-      cum_hazard <- ggsurvplot(km_fit_comp,
+      cum_hazard_comp <- ggsurvplot(km_fit_comp,
                                data = summary_table,
                                fun          = "cumhaz",
                                conf.int     = TRUE,
@@ -1064,6 +1064,13 @@ rFunction = function(data, sdk, time_period_start, time_period_end, fix_na_start
                                        legend.text   = element_text(size = 10)))
     }
   }
+  
+  # want to figure out how to add width, height, units, dpi, bg to artifact 
+  artifact <- appArtifactPath("cum_hazard_comparison_plot.png")
+  logger.info(paste("Saving cumulative hazard comparison plots:", artifact))
+  png(artifact)
+  cum_hazard_comp
+  dev.off()
   
   # Pass original to the next app in the MoveApps workflow
   return(data)
