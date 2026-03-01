@@ -18,7 +18,7 @@ This app implements fundamental Kaplan-Meier (KM) survival estimation functions.
 
 **Log-rank Test:** Users can request log-rank tests (Mantel–Cox test) to compare survival distributions across groups. The log-rank test assesses whether there are statistically significant differences in survival between two or more independent groups. Currently supported grouping variables are: sex, life stage, reproductive condition, or tag/collar attachment type. 
 
-**Cumulative Hazard Plots:** DEFINE 
+**Cumulative Hazard Plots:** This plot depicts the the total accumulated risk (e.g., the expected number of mortalities) the population has experienced up to a specific time.
 
 Users define a study period, can censor data to exclude post-capture mortality events, and specify how to handle missing timestamp information.
 
